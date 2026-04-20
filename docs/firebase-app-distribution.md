@@ -3,7 +3,7 @@
 ## 1. Crear app Android en Firebase
 
 1. Crear un proyecto en Firebase Console.
-2. Registrar app Android con package `com.demopokedex` (o el package real de tu app).
+2. Registrar app Android con package `com.pokedexdemo` (o el package real de tu app).
 3. Descargar `google-services.json`.
 4. Copiar el archivo en `android/app/google-services.json`.
 

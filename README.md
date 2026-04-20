@@ -171,7 +171,7 @@ Incluye etapas:
 
 El demo usa por defecto:
 
-- `applicationId`: `com.demopokedex`
+- `applicationId`: `com.pokedexdemo`
 
 Si se cambia, actualizar:
 
