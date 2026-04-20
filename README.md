@@ -1,97 +1,203 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Demo Pokedex QA Usabilidad (React Native Bare)
 
-# Getting Started
+Este repositorio es un demo técnico para defender una propuesta interna: formalizar un flujo de QA de usabilidad en apps mobile Android mediante builds compartibles, sin depender de builds locales ni acceso al repositorio para testers.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+La Pokedex es un caso funcional simple para demostrar distribución interna real con Firebase App Distribution.
 
-## Step 1: Start Metro
+## 1) Propósito del demo
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- Mostrar una app Android funcional y visualmente cuidada.
+- Consumir datos reales de [PokeAPI](https://pokeapi.co/).
+- Probar un flujo claro de empaquetado y distribución a testers.
+- Validar que el equipo puede iterar en QA de usabilidad sin fricción operativa.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## 2) Stack usado
 
-```sh
-# Using npm
+- React Native bare (`0.85.1`) con TypeScript.
+- Android como plataforma foco.
+- React Navigation (stack nativo).
+- Axios para consumo HTTP.
+- Firebase App Distribution para distribución interna.
+- GitHub Actions como pipeline de referencia.
+
+## 3) Estructura principal
+
+```text
+src/
+  api/
+  components/
+  hooks/
+  navigation/
+  screens/
+  services/
+  theme/
+  types/
+  utils/
+android/
+.github/workflows/
+docs/
+```
+
+## 4) Instalación
+
+Pre requisitos:
+
+- Node.js `>=20.19.0`
+- Java 17
+- Android SDK configurado
+- Emulador Android o dispositivo físico
+
+Comandos:
+
+```bash
+npm install
+```
+
+## 5) Correr en Android local
+
+Terminal 1:
+
+```bash
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
+Terminal 2:
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
-
-```sh
-# Using npm
+```bash
 npm run android
-
-# OR using Yarn
-yarn android
 ```
 
-### iOS
+## 6) Funcionalidad incluida
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+- Listado de Pokemon con paginación (`load more`).
+- Búsqueda por nombre sobre datos cargados.
+- Pantalla de detalle con:
+  - nombre
+  - imagen
+  - tipos
+  - altura y peso
+  - habilidades
+  - stats principales
+- Loading, empty state, error state y pull to refresh.
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+## 7) Comandos de build Android
 
-```sh
-bundle install
+Generar APK debug:
+
+```bash
+npm run build:apk:debug
 ```
 
-Then, and every time you update your native dependencies, run:
+Generar APK release:
 
-```sh
-bundle exec pod install
+```bash
+npm run build:apk:release
 ```
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+Generar AAB release:
 
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
+```bash
+npm run build:aab:release
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+## 8) Integración Firebase (App Distribution)
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+### Archivos y ubicaciones
 
-## Step 3: Modify your app
+- Colocar `google-services.json` en `android/app/google-services.json`.
+- Configurar App ID de Firebase: `YOUR_FIREBASE_APP_ID`.
+- Configurar grupos de testers: `YOUR_FIREBASE_TESTER_GROUPS`.
 
-Now that you have successfully run the app, let's make changes!
+### Variables esperadas
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+Basarse en `.env.example`:
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
+- `ANDROID_PACKAGE_NAME`
+- `FIREBASE_APP_ID`
+- `FIREBASE_TESTER_GROUPS`
+- `FIREBASE_SERVICE_ACCOUNT_JSON`
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+### Distribución manual vía Gradle
 
-## Congratulations! :tada:
+```bash
+cd android
+./gradlew appDistributionUploadRelease -PfirebaseAppId=YOUR_FIREBASE_APP_ID -PfirebaseGroups=qa-usability-testers -PfirebaseServiceCredentialsFile=../firebase-service-account.json
+```
 
-You've successfully run and modified your React Native App. :partying_face:
+Guía detallada: `docs/firebase-app-distribution.md`.
 
-### Now what?
+## 9) Pipeline CI/CD (GitHub Actions)
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
+Archivo: `.github/workflows/android-firebase-distribution.yml`
 
-# Troubleshooting
+Flujo:
 
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
+1. checkout del repositorio
+2. setup Node + Java
+3. `npm ci`
+4. `npm run lint`
+5. `npm run typecheck`
+6. habilitar permisos de `gradlew`
+7. build APK release
+8. publicación de artefacto
+9. distribución a Firebase App Distribution
 
-# Learn More
+Secrets requeridos en GitHub:
 
-To learn more about React Native, take a look at the following resources:
+- `FIREBASE_APP_ID`
+- `FIREBASE_TESTER_GROUPS`
+- `FIREBASE_SERVICE_ACCOUNT_JSON`
+- `GOOGLE_SERVICES_JSON` (opcional si se quiere inyectar el archivo desde CI)
+- `ANDROID_KEYSTORE_BASE64`
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
 
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+## 10) Pipeline alternativo GitLab
+
+Archivo opcional: `.gitlab-ci.yml`
+
+Incluye etapas:
+
+- `validate`
+- `build`
+- `distribute`
+
+## 11) Android package y placeholders
+
+El demo usa por defecto:
+
+- `applicationId`: `com.demopokedex`
+
+Si se cambia, actualizar:
+
+- `android/app/build.gradle`
+- App Android en Firebase (debe coincidir con package final)
+
+Placeholders usados en el repo:
+
+- `YOUR_FIREBASE_APP_ID`
+- `YOUR_ANDROID_KEYSTORE_BASE64`
+- `YOUR_ANDROID_KEYSTORE_PASSWORD`
+- `YOUR_ANDROID_KEY_ALIAS`
+- `YOUR_ANDROID_KEY_PASSWORD`
+
+## 12) Cómo presentar este demo ante Tech Leads
+
+Mensaje recomendado:
+
+1. El equipo produce builds Android reproducibles desde CI.
+2. QA de usabilidad puede testear sin acceso al repo.
+3. Firebase App Distribution centraliza la entrega a grupos de testers.
+4. Se habilita una rama/pipeline para feedback temprano y continuo.
+5. Se reduce dependencia de builds locales de developers.
+
+Resultado esperado de la propuesta:
+
+- Menor fricción en validación de UX.
+- Mayor trazabilidad de versiones probadas.
+- Menor tiempo entre cambio y feedback de usabilidad.

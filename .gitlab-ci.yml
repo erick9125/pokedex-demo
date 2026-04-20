@@ -1,0 +1,57 @@
+stages:
+  - validate
+  - build
+  - distribute
+
+variables:
+  GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
+
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - node_modules/
+    - .gradle/
+
+validate:
+  stage: validate
+  image: node:20
+  script:
+    - npm ci
+    - npm run lint
+    - npm run typecheck
+
+build_android_release:
+  stage: build
+  image: gradle:8.10.2-jdk17
+  script:
+    - apt-get update && apt-get install -y nodejs npm
+    - npm ci
+    - if [ -n "$GOOGLE_SERVICES_JSON" ]; then echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json; fi
+    - echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > firebase-service-account.json
+    - if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore; fi
+    - chmod +x android/gradlew
+    - export SIGNING_ARGS=""
+    - if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then export SIGNING_ARGS="-PreleaseStoreFile=release.keystore -PreleaseStorePassword=$ANDROID_KEYSTORE_PASSWORD -PreleaseKeyAlias=$ANDROID_KEY_ALIAS -PreleaseKeyPassword=$ANDROID_KEY_PASSWORD"; fi
+    - cd android
+    - ./gradlew assembleRelease -PfirebaseAppId=$FIREBASE_APP_ID -PfirebaseGroups=$FIREBASE_TESTER_GROUPS -PfirebaseServiceCredentialsFile=../firebase-service-account.json -PfirebaseReleaseNotes="GitLab build $CI_COMMIT_SHORT_SHA" $SIGNING_ARGS
+  artifacts:
+    paths:
+      - android/app/build/outputs/apk/release/app-release.apk
+    expire_in: 7 days
+
+distribute_firebase:
+  stage: distribute
+  image: gradle:8.10.2-jdk17
+  dependencies:
+    - build_android_release
+  script:
+    - echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > firebase-service-account.json
+    - if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore; fi
+    - chmod +x android/gradlew
+    - export SIGNING_ARGS=""
+    - if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then export SIGNING_ARGS="-PreleaseStoreFile=release.keystore -PreleaseStorePassword=$ANDROID_KEYSTORE_PASSWORD -PreleaseKeyAlias=$ANDROID_KEY_ALIAS -PreleaseKeyPassword=$ANDROID_KEY_PASSWORD"; fi
+    - cd android
+    - ./gradlew appDistributionUploadRelease -PfirebaseAppId=$FIREBASE_APP_ID -PfirebaseGroups=$FIREBASE_TESTER_GROUPS -PfirebaseServiceCredentialsFile=../firebase-service-account.json -PfirebaseReleaseNotes="GitLab QA build $CI_COMMIT_SHORT_SHA" $SIGNING_ARGS
+  only:
+    - main
+    - qa

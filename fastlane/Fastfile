@@ -1,0 +1,20 @@
+default_platform(:android)
+
+platform :android do
+  desc "Build and distribute release APK to Firebase App Distribution"
+  lane :qa_release do
+    gradle(
+      task: "assemble",
+      build_type: "Release",
+      project_dir: "android"
+    )
+
+    firebase_app_distribution(
+      app: ENV["FIREBASE_APP_ID"],
+      groups: ENV["FIREBASE_TESTER_GROUPS"],
+      apk_path: "android/app/build/outputs/apk/release/app-release.apk",
+      release_notes: "Fastlane QA usability demo build",
+      service_credentials_file: ENV["FIREBASE_SERVICE_CREDENTIALS_FILE"]
+    )
+  end
+end

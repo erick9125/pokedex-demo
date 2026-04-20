@@ -1,0 +1,98 @@
+name: Android Firebase Distribution
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - qa
+
+jobs:
+  build-and-distribute:
+    runs-on: ubuntu-latest
+    env:
+      FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+      FIREBASE_TESTER_GROUPS: ${{ secrets.FIREBASE_TESTER_GROUPS }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Ensure Gradle wrapper is executable
+        run: chmod +x android/gradlew
+
+      - name: Configure Firebase credentials
+        run: |
+          echo "$FIREBASE_SERVICE_ACCOUNT_JSON" > firebase-service-account.json
+
+      - name: Configure google-services.json
+        run: |
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
+            echo "${{ secrets.GOOGLE_SERVICES_JSON }}" > android/app/google-services.json
+          fi
+
+      - name: Configure release keystore
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/release.keystore
+          fi
+
+      - name: Build release APK
+        run: |
+          SIGNING_ARGS=""
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            SIGNING_ARGS=" -PreleaseStoreFile=release.keystore -PreleaseStorePassword=$ANDROID_KEYSTORE_PASSWORD -PreleaseKeyAlias=$ANDROID_KEY_ALIAS -PreleaseKeyPassword=$ANDROID_KEY_PASSWORD"
+          fi
+          cd android
+          ./gradlew assembleRelease \
+            -PfirebaseAppId=$FIREBASE_APP_ID \
+            -PfirebaseGroups=$FIREBASE_TESTER_GROUPS \
+            -PfirebaseServiceCredentialsFile=../firebase-service-account.json \
+            -PfirebaseReleaseNotes="CI build ${GITHUB_SHA::7}" \
+            $SIGNING_ARGS
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+
+      - name: Distribute to Firebase App Distribution
+        run: |
+          SIGNING_ARGS=""
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ] && [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && [ -n "$ANDROID_KEY_ALIAS" ] && [ -n "$ANDROID_KEY_PASSWORD" ]; then
+            SIGNING_ARGS=" -PreleaseStoreFile=release.keystore -PreleaseStorePassword=$ANDROID_KEYSTORE_PASSWORD -PreleaseKeyAlias=$ANDROID_KEY_ALIAS -PreleaseKeyPassword=$ANDROID_KEY_PASSWORD"
+          fi
+          cd android
+          ./gradlew appDistributionUploadRelease \
+            -PfirebaseAppId=$FIREBASE_APP_ID \
+            -PfirebaseGroups=$FIREBASE_TESTER_GROUPS \
+            -PfirebaseServiceCredentialsFile=../firebase-service-account.json \
+            -PfirebaseReleaseNotes="QA usability demo build ${GITHUB_SHA::7}" \
+            $SIGNING_ARGS

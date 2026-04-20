@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply plugin: "com.google.firebase.appdistribution"
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -71,6 +72,11 @@ def enableProguardInReleaseBuilds = false
  * this variant is about 6MiB larger per architecture than default.
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
+def releaseStoreFilePath = providers.gradleProperty("releaseStoreFile").orNull ?: System.getenv("ANDROID_RELEASE_STORE_FILE")
+def releaseStorePassword = providers.gradleProperty("releaseStorePassword").orNull ?: System.getenv("ANDROID_KEYSTORE_PASSWORD")
+def releaseKeyAlias = providers.gradleProperty("releaseKeyAlias").orNull ?: System.getenv("ANDROID_KEY_ALIAS")
+def releaseKeyPassword = providers.gradleProperty("releaseKeyPassword").orNull ?: System.getenv("ANDROID_KEY_PASSWORD")
+def hasReleaseSigning = releaseStoreFilePath != null && releaseStorePassword != null && releaseKeyAlias != null && releaseKeyPassword != null
 
 android {
     ndkVersion rootProject.ext.ndkVersion
@@ -92,18 +98,42 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(releaseStoreFilePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
         }
+    }
+}
+
+def firebaseAppId = providers.gradleProperty("firebaseAppId").orNull ?: System.getenv("FIREBASE_APP_ID")
+def firebaseGroups = providers.gradleProperty("firebaseGroups").orNull ?: System.getenv("FIREBASE_TESTER_GROUPS")
+def firebaseReleaseNotes = providers.gradleProperty("firebaseReleaseNotes").orNull ?: "Internal QA usability demo build"
+def firebaseServiceCredentialsFile = providers.gradleProperty("firebaseServiceCredentialsFile").orNull ?: System.getenv("FIREBASE_CREDENTIALS_FILE")
+
+firebaseAppDistribution {
+    if (firebaseAppId != null) {
+        appId = firebaseAppId
+    }
+    if (firebaseGroups != null) {
+        groups = firebaseGroups
+    }
+    releaseNotes = firebaseReleaseNotes
+    if (firebaseServiceCredentialsFile != null) {
+        serviceCredentialsFile = firebaseServiceCredentialsFile
     }
 }
 
@@ -116,4 +146,9 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+}
+
+def googleServicesFile = file("google-services.json")
+if (googleServicesFile.exists()) {
+    apply plugin: "com.google.gms.google-services"
 }
