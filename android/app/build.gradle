@@ -149,6 +149,10 @@ dependencies {
 }
 
 def googleServicesFile = file("google-services.json")
+def legacyGoogleServiceFile = file("google-service.json")
+if (!googleServicesFile.exists() && legacyGoogleServiceFile.exists()) {
+    ant.copy(file: legacyGoogleServiceFile, tofile: googleServicesFile)
+}
 if (googleServicesFile.exists()) {
     apply plugin: "com.google.gms.google-services"
 }
